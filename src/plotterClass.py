@@ -14,11 +14,13 @@ DEFAULT_PLOTS_DIR = os.path.join('plots')
 class Plotter():
     def __init__(self, case_results_dir = None, reference_dir = None,
                   plots_dir = DEFAULT_PLOTS_DIR, case_name = None,
-                    save=True, show=False, plot_reference=True):
+                    save=True, show=False, plot_reference=True,
+                 plots_file_extension = 'svg'):
 
         self.save = save
         self.show = show
         self.plot_reference = plot_reference
+        self.plots_file_extension = plots_file_extension
         plt.style.use("ggplot") # plot styling
 
         if case_results_dir is not None:
@@ -46,7 +48,7 @@ class Plotter():
         )
 
 
-    def plot_from_keys(self, xkey, ykey, title='plot', plot_file_extension='svg'):
+    def plot_from_keys(self, xkey, ykey, title='plot', styles=None, data_choice_key='last'):
         """
         plotting generic 2 variables
         need xkey and ykey to exist in all plotted elements (reference and case)
@@ -56,20 +58,32 @@ class Plotter():
 
         # plot reference
         if self.plot_reference:
-            ax.plot(self.reference_data.data[xkey], self.reference_data.data[ykey], **self.reference_data.style, label=self.reference_data.name)
+            ax.plot(self.reference_data.data[xkey], self.reference_data.data[ykey],
+                    **self.reference_data.style, label=self.reference_data.name)
 
         # plot case results
 
         # TODO: change file match our results
 
         dc = self.case_results.data_ranges
-        # Extract the maximum key and its corresponding value
-        max_key = max(dc['sample'], key=int)  # Convert keys to int for comparison
-        last_data_files = dc['sample'][max_key]
+
+        if data_choice_key == 'last':  # default - last saved data range
+            key = str(max(dc['sample'], key=int))  # pick max of existing keys
+        elif isinstance(data_choice_key, (str, int)): # alternative - input-specified key
+            key = str(data_choice_key)
+        else:
+            raise ValueError('input parameter data_choice_key has an unsupported type')
+
+        data_files = dc['sample'][key]
         # last_data_entry = last_data_files['bottom']
 
-        for last_data_entry in last_data_files.values():
-            ax.plot(last_data_entry.data[xkey], last_data_entry.data[ykey], **last_data_entry.style,
+        if isinstance(styles, dict): # if only one style param is passed
+            styles = [styles] * len(data_files) # create a list of same style
+
+        for style, last_data_entry in zip(styles, data_files.values()):
+            if style is None:
+                style = last_data_entry.style
+            ax.plot(last_data_entry.data[xkey], last_data_entry.data[ykey], **style,
                     label=last_data_entry.name)
         
         ax.set_xlabel(xkey)
@@ -77,10 +91,19 @@ class Plotter():
         ax.legend()
 
         if self.save:
-            plt.savefig(os.path.join(self.plots_dir, '{}.{}'.format(title, plot_file_extension)))
+            plt.savefig(os.path.join(self.plots_dir, '{}.{}'.format(title, self.plots_file_extension)))
         if self.show:
             plt.show()
         plt.clf()
+
+    # TODO
+    def plot_time_evolution(self):
+        pass
+
+    # TODO
+    def plot_yplus_histogram(self):
+        pass # where tf is yplus stored?
+
 
 
 if __name__ == "__main__":
